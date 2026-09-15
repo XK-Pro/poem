@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日诗词</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: "Songti SC", "SimSun", "STSong", "Noto Serif SC", serif;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    min-height: 100vh; padding: 24px; text-align: center;
+  }
+
+  #loader {
+    position: fixed; inset: 0;
+    background: #000;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    z-index: 999;
+    transition: opacity 0.6s ease;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+
+  .loader-circle {
+    width: 48px; height: 48px;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: rgba(255,255,255,0.9);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-text {
+    margin-top: 18px; font-size: 0.95rem;
+    letter-spacing: 0.3em; opacity: 0.5;
+  }
+
+  #main {
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    width: 100%;
+    opacity: 0; transform: translateY(12px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  #main.show { opacity: 1; transform: translateY(0); }
+
+  #poem-content {
+    font-size: 2.2rem; line-height: 1.6; letter-spacing: 0.05em;
+    max-width: 90%; transition: opacity 0.35s ease;
+  }
+  #poem-content.fade { opacity: 0; }
+  #poem-info {
+    font-size: 1.1rem; margin-top: 24px; opacity: 0.7;
+    transition: opacity 0.35s ease;
+  }
+  #poem-info.fade { opacity: 0; }
+
+  #full-poem {
+    max-height: 0; overflow: hidden;
+    margin-top: 0; font-size: 1.05rem; line-height: 2;
+    max-width: 90%; opacity: 0;
+    transition: max-height 0.8s cubic-bezier(0.25, 0.8, 0.25, 1),
+                opacity 0.8s ease, margin-top 0.8s ease;
+  }
+  #full-poem.show { max-height: 2000px; opacity: 0.8; margin-top: 24px; }
+
+  .btn-row { display: flex; gap: 14px; margin-top: 32px; }
+  .btn-row button {
+    padding: 10px 24px;
+    background: transparent; color: #fff;
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 24px; font-size: 0.95rem;
+    font-family: inherit; cursor: pointer;
+    transition: background 0.2s ease, opacity 0.2s ease;
+  }
+  .btn-row button:active { background: rgba(255,255,255,0.15); opacity: 0.7; }
+  .btn-row button:disabled { opacity: 0.3; cursor: default; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-circle"></div>
+  <div class="loader-text">诗</div>
+</div>
+
+<div id="main">
+  <div id="poem-content">加载中...</div>
+  <div id="poem-info"></div>
+  <div id="full-poem"></div>
+  <div class="btn-row">
+    <button id="toggle-btn">显示全文</button>
+    <button id="refresh-btn">再来一首</button>
+  </div>
+</div>
+
+<script>
+  const loaderEl = document.getElementById('loader');
+  const mainEl = document.getElementById('main');
+  const contentEl = document.getElementById('poem-content');
+  const infoEl = document.getElementById('poem-info');
+  const fullEl = document.getElementById('full-poem');
+  const toggleBtn = document.getElementById('toggle-btn');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  let fullLines = [];
+  let firstLoad = true;
+
+  // 古诗词·一言 API，每次请求随机返回
+  async function fetchPoem() {
+    const res = await fetch('https://v1.jinrishici.com/all.json');
+    const json = await res.json();
+    return json;
+  }
+
+  function render(d) {
+    contentEl.innerText = d.content;
+    // 一言 API 返回 author 和 origin（出处）
+    infoEl.innerText = `${d.author}《${d.origin}》`;
+
+    // 一言 API 不返回全文，用单句填充，全文按钮隐藏
+    fullLines = [];
+    fullEl.innerHTML = '';
+    fullEl.classList.remove('show');
+    toggleBtn.style.display = 'none';
+
+    requestAnimationFrame(() => {
+      contentEl.classList.remove('fade');
+      infoEl.classList.remove('fade');
+    });
+
+    if (firstLoad) {
+      firstLoad = false;
+      loaderEl.classList.add('hide');
+      setTimeout(() => { mainEl.classList.add('show'); }, 100);
+      setTimeout(() => { loaderEl.style.display = 'none'; }, 700);
+    }
+  }
+
+  async function load() {
+    if (!firstLoad) {
+      contentEl.classList.add('fade');
+      infoEl.classList.add('fade');
+    }
+    try {
+      const d = await fetchPoem();
+      const delay = firstLoad ? 500 : 200;
+      setTimeout(() => render(d), delay);
+    } catch (e) {
+      contentEl.innerText = '加载失败，请刷新';
+      infoEl.innerText = '';
+      if (firstLoad) {
+        firstLoad = false;
+        loaderEl.classList.add('hide');
+        mainEl.classList.add('show');
+      }
+    }
+  }
+
+  refreshBtn.onclick = function() {
+    refreshBtn.disabled = true;
+    load();
+    setTimeout(() => refreshBtn.disabled = false, 600);
+  };
+
+  load();
+</script>
+</body>
+</html>
