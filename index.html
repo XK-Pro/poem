@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>每日诗词</title>
+<title>Random Chinese Poem</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -67,9 +67,9 @@
   }
   #full-poem.show { max-height: 2000px; opacity: 0.8; margin-top: 24px; }
 
-  .btn-row { display: flex; gap: 14px; margin-top: 32px; }
+  .btn-row { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; justify-content: center; }
   .btn-row button {
-    padding: 10px 24px;
+    padding: 10px 22px;
     background: transparent; color: #fff;
     border: 1px solid rgba(255,255,255,0.4);
     border-radius: 24px; font-size: 0.95rem;
@@ -78,6 +78,20 @@
   }
   .btn-row button:active { background: rgba(255,255,255,0.15); opacity: 0.7; }
   .btn-row button:disabled { opacity: 0.3; cursor: default; }
+
+  #copy-toast {
+    position: fixed; bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(255,255,255,0.15);
+    color: #fff; padding: 8px 20px;
+    border-radius: 20px; font-size: 0.9rem;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    backdrop-filter: blur(8px);
+  }
+  #copy-toast.show {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
 </style>
 </head>
 <body>
@@ -93,9 +107,12 @@
   <div id="full-poem"></div>
   <div class="btn-row">
     <button id="toggle-btn">显示全文</button>
+    <button id="copy-btn">一键复制</button>
     <button id="refresh-btn">再来一首</button>
   </div>
 </div>
+
+<div id="copy-toast">已复制</div>
 
 <script>
   const loaderEl = document.getElementById('loader');
@@ -104,12 +121,15 @@
   const infoEl = document.getElementById('poem-info');
   const fullEl = document.getElementById('full-poem');
   const toggleBtn = document.getElementById('toggle-btn');
+  const copyBtn = document.getElementById('copy-btn');
   const refreshBtn = document.getElementById('refresh-btn');
+  const toastEl = document.getElementById('copy-toast');
 
   let fullLines = [];
   let firstLoad = true;
+  let currentContent = '';
+  let currentInfo = '';
 
-  // 古诗词·一言 API，每次请求随机返回
   async function fetchPoem() {
     const res = await fetch('https://v1.jinrishici.com/all.json');
     const json = await res.json();
@@ -117,11 +137,11 @@
   }
 
   function render(d) {
-    contentEl.innerText = d.content;
-    // 一言 API 返回 author 和 origin（出处）
-    infoEl.innerText = `${d.author}《${d.origin}》`;
+    currentContent = d.content;
+    currentInfo = `${d.author}《${d.origin}》`;
+    contentEl.innerText = currentContent;
+    infoEl.innerText = currentInfo;
 
-    // 一言 API 不返回全文，用单句填充，全文按钮隐藏
     fullLines = [];
     fullEl.innerHTML = '';
     fullEl.classList.remove('show');
@@ -158,6 +178,44 @@
         mainEl.classList.add('show');
       }
     }
+  }
+
+  toggleBtn.onclick = function() {
+    if (!fullLines.length) return;
+    fullEl.classList.toggle('show');
+    toggleBtn.innerText = fullEl.classList.contains('show') ? '收起' : '显示全文';
+  };
+
+  copyBtn.onclick = async function() {
+    if (!currentContent) return;
+    const text = `${currentContent}—————${currentInfo}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('已复制');
+    } catch (e) {
+      // 旧浏览器或非 HTTPS 环境回退方案
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('已复制');
+      } catch (err) {
+        showToast('复制失败，请长按选择');
+      }
+      document.body.removeChild(ta);
+    }
+  };
+
+  let toastTimer = null;
+  function showToast(msg) {
+    toastEl.innerText = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1500);
   }
 
   refreshBtn.onclick = function() {
